@@ -14,7 +14,7 @@ var default_workspace           = [__dirname, "workspace"].join('/'),
 	// documentation
 	documentation_markup_regexp = /(\*|[\r\n])/g,
 	// @param type, name, and description
-	function_param_regexp       = /@param\s+\{(.*?)\}\s+(\w+)\s+([^\r\n]+)/,
+	function_param_regexp       = /@param\s+\{(.*?)\}\s+(\w+)\s*([\w\s]*)$/,
 	// @return type an description
 	function_return_regexp      = /@return\s+\{(.*?)\}\s+([^\r\n]+)/;
 
@@ -34,11 +34,13 @@ function run(options) {
 							widget_implementation = cx[6];
 						console.log('# ', widget_name);
 						console.log('- Functions');
-						var implementation_cx = new chunx(widget_implementation);
-						implementation_cx.find(function_header_regexp, function(cx) {
+						cx.find(function_header_regexp, function(cx) {
 							var function_documentation = cx[1].replace(documentation_markup_regexp, ' '),
 								function_name = cx[4];
 							console.log("\t- ", markdown_escape(function_name));
+							cx.find(function_param_regexp, function(cx) {
+								console.log("\t\t- {" + cx[1] + "} " + markdown_escape(cx[2]) + " " + cx[3]);
+							});
 						});
 					});
 				}
