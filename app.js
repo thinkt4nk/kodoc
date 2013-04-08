@@ -7,7 +7,7 @@ var chester = require('chester'),
 var default_workspace           = [__dirname, "workspace"].join('/'),
 	options                     = { workspace: default_workspace },
 	// widget header
-	widget_header_regexp        = /\/\*\*((.|[\r\n])*)\*\/\s*(\r\n|\n)*\s*(.*)\.subclass\(['"]([\w\.]*)['"]\s*,\s*\{((.|[\r\n])*)\}\);/,
+	widget_header_regexp        = /\/\*\*((.|[\r\n])*)\*\/\s*(\r\n|\n)*\s*(.*?)\.subclass\(['"]([\w\.]*)['"]\s*,\s*\{((.|[\r\n])*?)\}\);/,
 	// function header
 	function_header_regexp      = /\/\*\*((.|[\r\n])*?)\*\/\s*(\r\n|\n)*\s*(.*?)\s*:\s*function/,
 	// documentation
@@ -21,40 +21,60 @@ function run(options) {
 	if (options.target == null) {
 		error('Target not specified');
 	}
-	chester.enumerate(options.target, function(files) {
+	chester.enumerate(options.target, { match: /\.js$/ }, function(files) {
 		var async_group = [];
 		files.forEach(function(f) {
 			async_group.push(
 				(function() {
 					var file = f;
 					return function(cb) {
+						//  ** last blocking call **
 						fs.readFile(file, 'utf-8', function(err, data) {
 							if (!err) {
 								var cx = new chunx(data);
+								var widgets = [];
 								cx.find(widget_header_regexp, function(cx) {
 									var widget_documentation  = cx[1].replace(documentation_markup_regexp, ' '),
 										widget_parent         = cx[4],
 										widget_name           = cx[5],
-										widget_implementation = cx[6];
-									console.log('# ', widget_name);
-									console.log('- Functions');
+										widget_implementation = cx[6],
+										widget                = {
+											documentation: widget_documentation,
+											parent:        widget_parent,
+											name:          widget_name,
+											functions:     []
+										};
+									//console.log('# ', widget_name);
+									//console.log('- Functions');
 									cx.find(function_header_regexp, function(cx) {
 										var function_documentation = cx[1].replace(documentation_markup_regexp, ' '),
-											function_name = cx[4];
-										console.log("\t- ", markdown_escape(function_name));
+											function_name          = cx[4],
+											fn                     = {};
+										fn.documentation = function_documentation;
+										fn.name = function_name;
+										fn.params = [];
+										//console.log("\t- ", markdown_escape(function_name));
 										cx.find(function_param_regexp, function(cx) {
-											console.log("\t\t- {" + cx[1] + "} " + markdown_escape(cx[2]) + " " + cx[3]);
+											fn.params.push({ "type": cx[1], "name": markdown_escape(cx[2]), "description": cx[3] });
+											//console.log("\t\t- {" + cx[1] + "} " + markdown_escape(cx[2]) + " " + cx[3]);
 										});
 									});
+									widgets.push(widget);
 								});
 							}
-							cb();
+							cb(null, { path: file, widgets: widgets });
 						});
 					}
 				})()
 			);
 		});
-		function onParse(err, result) {
+		function onParse(err, results) {
+			results.forEach(function(result) {
+				if (result.widgets.length > 0) {
+					console.log(result);
+				}
+			});
+			//console.log(result);
 			// link
 		}
 		// execute in parallel, and link references when finished
