@@ -1,0 +1,3 @@
+workspace/*
+*.swp
+node_modules/*
