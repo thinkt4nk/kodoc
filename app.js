@@ -4,7 +4,6 @@ var chester = require('chester'),
 	async   = require('async');
 
 
-	
 var default_workspace           = [__dirname, "workspace"].join('/'),
 	options                     = { workspace: default_workspace },
 	// widget header
@@ -23,29 +22,43 @@ function run(options) {
 		error('Target not specified');
 	}
 	chester.enumerate(options.target, function(files) {
-		files.forEach(function(file) {
-			fs.readFile(file, 'utf-8', function(err, data) {
-				if (!err) {
-					var cx = new chunx(data);
-					cx.find(widget_header_regexp, function(cx) {
-						var widget_documentation  = cx[1].replace(documentation_markup_regexp, ' '),
-							widget_parent         = cx[4],
-							widget_name           = cx[5],
-							widget_implementation = cx[6];
-						console.log('# ', widget_name);
-						console.log('- Functions');
-						cx.find(function_header_regexp, function(cx) {
-							var function_documentation = cx[1].replace(documentation_markup_regexp, ' '),
-								function_name = cx[4];
-							console.log("\t- ", markdown_escape(function_name));
-							cx.find(function_param_regexp, function(cx) {
-								console.log("\t\t- {" + cx[1] + "} " + markdown_escape(cx[2]) + " " + cx[3]);
-							});
+		var async_group = [];
+		files.forEach(function(f) {
+			async_group.push(
+				(function() {
+					var file = f;
+					return function(cb) {
+						fs.readFile(file, 'utf-8', function(err, data) {
+							if (!err) {
+								var cx = new chunx(data);
+								cx.find(widget_header_regexp, function(cx) {
+									var widget_documentation  = cx[1].replace(documentation_markup_regexp, ' '),
+										widget_parent         = cx[4],
+										widget_name           = cx[5],
+										widget_implementation = cx[6];
+									console.log('# ', widget_name);
+									console.log('- Functions');
+									cx.find(function_header_regexp, function(cx) {
+										var function_documentation = cx[1].replace(documentation_markup_regexp, ' '),
+											function_name = cx[4];
+										console.log("\t- ", markdown_escape(function_name));
+										cx.find(function_param_regexp, function(cx) {
+											console.log("\t\t- {" + cx[1] + "} " + markdown_escape(cx[2]) + " " + cx[3]);
+										});
+									});
+								});
+							}
+							cb();
 						});
-					});
-				}
-			});
+					}
+				})()
+			);
 		});
+		function onParse(err, result) {
+			// link
+		}
+		// execute in parallel, and link references when finished
+		async.parallel(async_group, onParse);
 	});
 }
 function markdown_escape(content) {
